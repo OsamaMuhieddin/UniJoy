@@ -56,19 +56,4 @@ router.post(
   authController.login
 );
 
-router.patch(
-  '/hosts/:hostId/status',
-  [
-    isAuth,
-    param('hostId').isMongoId().withMessage('Invalid host ID'),
-    body('hostStatus')
-      .trim()
-      .isIn(['approved', 'rejected', 'pending'])
-      .withMessage(
-        'Invalid host status. It must be one of the following: approved, rejected, pending'
-      ),
-  ],
-  authController.manageHostApproval
-);
-
 module.exports = router;
