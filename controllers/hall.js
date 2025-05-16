@@ -8,22 +8,36 @@ const User = require('../models/user');
 const Hall = require('../models/hall');
 
 exports.getHalls = (req, res, next) => {
-  const currentPage = req.query.page || 1;
-  const perPage = 2;
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
+
+  const skip = (page - 1) * limit;
+
+  const shouldPaginate = !isNaN(page) && !isNaN(limit);
+
   let totalItems;
-  Hall.find()
-    .countDocuments()
+
+  const countPromise = shouldPaginate
+    ? Hall.countDocuments()
+    : Promise.resolve(null);
+
+  countPromise
     .then((count) => {
       totalItems = count;
-      return Hall.find()
-        .skip((currentPage - 1) * perPage)
-        .limit(perPage);
+      const findQuery = Hall.find();
+
+      if (shouldPaginate) {
+        findQuery.skip(skip).limit(limit);
+      }
+
+      return findQuery;
     })
     .then((halls) => {
       res.status(200).json({
-        message: 'halls fetched successfully',
+        message: 'Halls fetched successfully',
         halls: halls,
-        totalItems: totalItems,
+        totalItems: totalItems || halls.length,
+        paginated: shouldPaginate,
       });
     })
     .catch((err) => {
@@ -35,17 +49,17 @@ exports.getHalls = (req, res, next) => {
 };
 
 exports.createHall = (req, res, next) => {
-  if (req.userRole !== 'manager') {
+  if (req.userRole !== 'admin') {
     const error = new Error('Not authorized to create halls');
     error.statusCode = 403;
-    return next(error);
+    throw error;
   }
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const error = new Error('Validation failed, entered data is incorrect');
     error.statusCode = 422;
-    return next(error);
+    throw error;
   }
 
   const name = req.file.name;
@@ -113,7 +127,7 @@ exports.updateHall = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
-      if (req.userRole !== 'manager') {
+      if (req.userRole !== 'admin') {
         const error = new Error('Not authorized to update this hall');
         error.statusCode = 403;
         throw error;
@@ -150,7 +164,7 @@ exports.deleteHall = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
-      if (req.userRole !== 'manager') {
+      if (req.userRole !== 'admin') {
         const error = new Error('Not authorized to delete this hall');
         error.statusCode = 403;
         throw error;

@@ -1,4 +1,4 @@
-const { vaildationResult } = require('express-validator');
+const { validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -95,7 +95,7 @@ exports.login = (req, res, next) => {
           userId: loadedUser._id.toString(),
           role: loadedUser.role,
         },
-        'somesupersecretsecret',
+        'somesecret',
         { expiresIn: '1h' }
       );
       res.status(200).json({
@@ -128,10 +128,10 @@ exports.manageHostApproval = (req, res, next) => {
     throw error;
   }
 
-  // Ensure only a manager can approve/reject hosts
-  if (req.userRole !== 'manager') {
+  // Ensure only a admin can approve/reject hosts
+  if (req.userRole !== 'admin') {
     const error = new Error(
-      'Not authorized. Only managers can approve or reject hosts.'
+      'Not authorized. Only admins can approve or reject hosts.'
     );
     error.statusCode = 403;
     throw error;

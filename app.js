@@ -9,10 +9,12 @@ const csrf = require('csurf');
 const flash = require('connect-flash');
 const multer = require('multer');
 
+const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const hostRoutes = require('./routes/host');
 const hallRoutes = require('./routes/hall');
-// const errorController = require('./controllers/error');
+const hostCategoriesRoutes = require('./routes/hostCategory');
+
 const User = require('./models/user');
 
 const MONGODB_URI = 'mongodb://127.0.0.1:27017';
@@ -67,9 +69,11 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('/admin', adminRoutes);
 app.use('/host', hostRoutes);
 app.use('/auth', authRoutes);
-app.use('/admin/hall', hallRoutes);
+app.use('/halls', hallRoutes);
+app.use('host-categories', hostCategoriesRoutes);
 // app.use(
 //   session({
 //     secret: 'my secret ',

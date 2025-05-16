@@ -18,7 +18,7 @@ const userSchema = new Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'host', 'manager'],
+      enum: ['user', 'host', 'admin'],
       required: true,
     },
     profileInfo: {

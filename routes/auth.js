@@ -7,6 +7,8 @@ const authController = require('../controllers/auth');
 const User = require('../models/user');
 
 const router = express.Router();
+
+// POST /signup
 router.post(
   '/signup',
   [
@@ -38,6 +40,7 @@ router.post(
   authController.signUp
 );
 
+// POST /signin
 router.post(
   '/signin',
   [
@@ -54,7 +57,7 @@ router.post(
 );
 
 router.patch(
-  '/host/:hostId/status',
+  '/hosts/:hostId/status',
   [
     isAuth,
     param('hostId').isMongoId().withMessage('Invalid host ID'),

@@ -2,15 +2,17 @@ const express = require('express');
 const { body } = require('express-validator');
 
 const hostController = require('../controllers/host');
+const isAuth = require('../middleware/is-auth');
 
 const router = express.Router();
 
 //GET /host/events
-router.get('/events', hostController.getEvents);
+router.get('/events', isAuth, hostController.getHostEvents);
 
-//POST /host/event
+//POST /host/events
 router.post(
-  '/event',
+  '/events',
+  isAuth,
   [
     body('title')
       .trim()
@@ -73,13 +75,16 @@ router.post(
       .notEmpty()
       .withMessage('Category must not be empty'),
   ],
-  hostController.createEvents
+  hostController.createEvent
 );
 
-router.get('/event/:eventId', hostController.getEvent);
+// GET /host/events/:eventId
+router.get('/events/:eventId', isAuth, hostController.getHostEvent);
 
+//PUT /host/events/:eventId
 router.put(
-  '/event/:eventId',
+  '/events/:eventId',
+  isAuth,
   [
     body('title')
       .trim()
@@ -145,6 +150,7 @@ router.put(
   hostController.updateEvent
 );
 
-router.delete('/event/:eventId', hostController.getEvent);
+//DELETE /host/events/:eventId
+router.delete('/events/:eventId', isAuth, hostController.deleteEvent);
 
 module.exports = router;

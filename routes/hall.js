@@ -6,8 +6,9 @@ const isAuth = require('../middleware/is-auth');
 
 const router = express.Router();
 
-// /admin/hall/
-router.get('/halls', hallController.getHalls);
+// GET /halls
+// Supports optional pagination with page and limit query params
+router.get('/', hallController.getHalls);
 
 router.get('/:hallId', hallController.getHall);
 

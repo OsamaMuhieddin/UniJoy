@@ -7,34 +7,34 @@ const Event = require('../models/event');
 const User = require('../models/user');
 const Hall = require('../models/hall');
 
-exports.getEvents = (req, res, next) => {
-  const currentPage = req.query.page || 1;
-  const perPage = 2;
+exports.getHostEvents = (req, res, next) => {
+  const currentPage = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.perPage) || 2;
+
   let totalItems;
-  Event.find()
+
+  Event.find({ host: req.userId })
     .countDocuments()
     .then((count) => {
       totalItems = count;
-      return Event.find()
+      return Event.find({ host: req.userId })
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
     .then((events) => {
       res.status(200).json({
-        message: 'fetched posts successfully',
+        message: 'Fetched events successfully',
         events: events,
         totalItems: totalItems,
       });
     })
     .catch((err) => {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
+      if (!err.statusCode) err.statusCode = 500;
       next(err);
     });
 };
 
-exports.createEvents = (req, res, next) => {
+exports.createEvent = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const error = new Error('Valdation failed, Entered data is incorrect');
@@ -61,7 +61,7 @@ exports.createEvents = (req, res, next) => {
   const host = req.userId;
   User.findById(host)
     .then((user) => {
-      if (!user || (user.role !== 'host' && user.role !== 'manager')) {
+      if (!user || (user.role !== 'host' && user.role !== 'admin')) {
         const error = new Error('Not Autherized');
         error.statusCode = 403;
         throw error;
@@ -107,8 +107,9 @@ exports.createEvents = (req, res, next) => {
     });
 };
 
-exports.getEvent = (req, res, next) => {
+exports.getHostEvent = (req, res, next) => {
   const eventId = req.params.eventId;
+
   Event.findById(eventId)
     .then((event) => {
       if (!event) {
@@ -116,6 +117,13 @@ exports.getEvent = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+
+      if (req.userRole !== 'admin' && event.host.toString() !== req.userId) {
+        const error = new Error('Not authorized to access this event');
+        error.statusCode = 403;
+        throw error;
+      }
+
       res.status(200).json({ message: 'Event fetched!', event: event });
     })
     .catch((err) => {
@@ -227,7 +235,7 @@ exports.deleteEvent = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
-      if (event.host.toString() !== req.userId || req.userRole !== 'manager') {
+      if (event.host.toString() !== req.userId || req.userRole !== 'admin') {
         const error = new Error('Not authorized to delete this event');
         error.statusCode = 403;
         throw error;
