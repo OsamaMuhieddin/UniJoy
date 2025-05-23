@@ -2,10 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 const { validationResult } = require('express-validator');
+const { checkReservationConflict } = require('../util/conflictChecker');
 
 const Event = require('../models/event');
 const User = require('../models/user');
 const Hall = require('../models/hall');
+const HallReservation = require('../models/hallReservation');
 
 exports.getHostEvents = (req, res, next) => {
   const currentPage = parseInt(req.query.page) || 1;
@@ -51,6 +53,8 @@ exports.createEvent = (req, res, next) => {
   const title = req.body.title;
   const description = req.body.description;
   const date = req.body.date;
+  const startDate = req.body.startDate;
+  const endDate = req.body.endDate;
   const time = req.body.time;
   const capacity = req.body.capacity;
   let price = req.body.price || 0.0;
@@ -62,41 +66,70 @@ exports.createEvent = (req, res, next) => {
   User.findById(host)
     .then((user) => {
       if (!user || (user.role !== 'host' && user.role !== 'admin')) {
-        const error = new Error('Not Autherized');
+        const error = new Error(
+          'Not authorized. Only hosts or admins can create events.'
+        );
         error.statusCode = 403;
         throw error;
       }
+
+      // If hall specified, check if there is any approved event conflicting for the same hall/time
+      if (hall) {
+        return Event.findOne({
+          hall: hall,
+          status: 'approved',
+          $or: [
+            {
+              startDate: { $lt: new Date(endDate), $gte: new Date(startDate) },
+            },
+            {
+              endDate: { $gt: new Date(startDate), $lte: new Date(endDate) },
+            },
+            {
+              startDate: { $lte: new Date(startDate) },
+              endDate: { $gte: new Date(endDate) },
+            },
+          ],
+        }).then((conflict) => {
+          if (conflict) {
+            const error = new Error(
+              'Hall is already reserved for the selected time.'
+            );
+            error.statusCode = 409; // Conflict
+            throw error;
+          }
+          return user;
+        });
+      }
+      // No hall or no conflicts, proceed
+      return user;
+    })
+    .then(() => {
       const event = new Event({
         title: title,
         description: description,
         date: date,
+        startDate: startDate,
+        endDate: endDate,
         time: time,
         image: image,
         capacity: capacity,
         price: price,
         location: location,
         host: host,
-        hall: hall,
+        hall: hall || null, // only set if present
         category: category,
+        status: 'pending',
       });
 
       return event.save();
     })
     .then((event) => {
-      if (hall) {
-        return Hall.findById(hall).then((hall) => {
-          if (hall) {
-            hall.status = 'reserved';
-            return hall.save();
-          }
-        });
-      }
-      return event;
-    })
-    .then((result) => {
+      // Hall is NOT reserved on creation — reservation happens on admin approval
+      // So just return the saved event
       res.status(201).json({
-        message: 'Event created successfully!',
-        event: result,
+        message: 'Event created successfully! Pending admin approval.',
+        event: event,
       });
     })
     .catch((err) => {
@@ -161,6 +194,7 @@ exports.updateEvent = (req, res, next) => {
     error.statusCode = 422;
     throw error;
   }
+  let eventDoc;
   Event.findById(eventId)
     .then((event) => {
       if (!event) {
@@ -168,103 +202,157 @@ exports.updateEvent = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
-      if (image !== event.image) {
-        clearImage(event.image);
+      // Role check: must be host or admin
+      if (event.host.toString() !== req.userId && req.userRole !== 'admin') {
+        const error = new Error('Not authorized to update this event.');
+        error.statusCode = 403;
+        throw error;
       }
-      event.title = title;
-      event.image = image;
-      event.description = description;
-      event.date = new Date(date);
-      event.time = time;
-      event.capacity = capacity;
-      event.location = location;
-      event.price = price || 0;
-      event.category = category;
-      if (hall) {
-        if (event.hall && event.hall.toString() !== hall.toString()) {
-          // If the hall is being changed, reset the old hall status and update the new hall
-          return Hall.findById(event.hall)
-            .then((oldHall) => {
-              if (oldHall) {
-                oldHall.status = 'available'; // Set old hall as available
-                return oldHall.save();
+      eventDoc = event;
+      // Check if hall or time changed, then check for conflicts
+      const hallChanged =
+        hall && (!event.hall || event.hall.toString() !== hall.toString());
+      const startDateChanged =
+        req.body.startDate &&
+        new Date(req.body.startDate).getTime() !== event.startDate.getTime();
+      const endDateChanged =
+        req.body.endDate &&
+        new Date(req.body.endDate).getTime() !== event.endDate.getTime();
+
+      if (hallChanged || startDateChanged || endDateChanged) {
+        // Check for reservation conflict excluding current event reservation
+        return checkReservationConflict(
+          hall,
+          new Date(req.body.startDate),
+          new Date(req.body.endDate),
+          event.hallReservationId // Assuming event stores the reservation id, else null
+        ).then((conflict) => {
+          if (conflict) {
+            const error = new Error(
+              'Hall is already reserved for the selected time.'
+            );
+            error.statusCode = 409;
+            throw error;
+          }
+          return true;
+        });
+      }
+      return true;
+    })
+    .then(() => {
+      // Update image if changed
+      if (image !== eventDoc.image) {
+        clearImage(eventDoc.image);
+        eventDoc.image = image;
+      }
+      // Update fields
+      eventDoc.title = title;
+      eventDoc.description = description;
+      eventDoc.date = new Date(date);
+      eventDoc.time = time;
+      eventDoc.capacity = capacity;
+      eventDoc.location = location;
+      eventDoc.price = price || 0;
+      eventDoc.category = category;
+
+      // If hall or time changed and event was approved, revert to pending and delete previous reservation
+      const hallChanged =
+        hall &&
+        (!eventDoc.hall || eventDoc.hall.toString() !== hall.toString());
+      const startDateChanged =
+        req.body.startDate &&
+        new Date(req.body.startDate).getTime() !== eventDoc.startDate.getTime();
+      const endDateChanged =
+        req.body.endDate &&
+        new Date(req.body.endDate).getTime() !== eventDoc.endDate.getTime();
+
+      if (hallChanged || startDateChanged || endDateChanged) {
+        if (eventDoc.status === 'approved') {
+          eventDoc.status = 'pending'; // Revert for re-approval
+          // Remove previous hall reservation if exists
+          return HallReservation.findOneAndDelete({ event: eventDoc._id })
+            .then(() => {
+              // Free old hall if exists
+              if (eventDoc.hall) {
+                return Hall.findById(eventDoc.hall).then((oldHall) => {
+                  if (oldHall) {
+                    oldHall.status = 'available';
+                    return oldHall.save();
+                  }
+                });
               }
             })
             .then(() => {
-              event.hall = hall; // Set new hall for event
-              return Hall.findById(hall);
-            })
-            .then((newHall) => {
-              if (newHall) {
-                newHall.status = 'reserved'; // Set new hall as reserved
-                return newHall.save();
-              }
-            })
-            .then(() => {
-              return event.save();
-            })
-            .catch((err) => {
-              const error = new Error('Error updating hall status');
-              error.statusCode = 500;
-              throw error;
+              eventDoc.hall = hall || null;
+              eventDoc.startDate = new Date(req.body.startDate);
+              eventDoc.endDate = new Date(req.body.endDate);
+              return eventDoc.save();
             });
         } else {
-          event.hall = hall;
-          return event.save();
+          // If event not approved, just update hall and dates
+          eventDoc.hall = hall || null;
+          eventDoc.startDate = new Date(req.body.startDate);
+          eventDoc.endDate = new Date(req.body.endDate);
+          return eventDoc.save();
         }
+      } else {
+        // Hall/time unchanged, just update other fields
+        return eventDoc.save();
       }
-      return event.save();
     })
     .then((result) => {
-      res.status(200).json({ message: 'Event Updated', event: result });
+      res
+        .status(200)
+        .json({ message: 'Event updated successfully.', event: result });
     })
     .catch((err) => {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
+      if (!err.statusCode) err.statusCode = 500;
       next(err);
     });
 };
 
 exports.deleteEvent = (req, res, next) => {
   const eventId = req.params.eventId;
-  Post.findById(eventId)
+
+  let eventDoc;
+  Event.findById(eventId)
     .then((event) => {
       if (!event) {
         const error = new Error('Could not find event!');
         error.statusCode = 404;
         throw error;
       }
-      if (event.host.toString() !== req.userId || req.userRole !== 'admin') {
-        const error = new Error('Not authorized to delete this event');
+      if (event.host.toString() !== req.userId && req.userRole !== 'admin') {
+        const error = new Error('Not authorized to delete this event.');
         error.statusCode = 403;
         throw error;
       }
-      if (event.hall) {
-        return Hall.findById(event.hall)
-          .then((hall) => {
-            if (hall) {
-              hall.status = 'available';
-              return hall.save();
-            }
-          })
-          .then(() => {
-            clearImage(event.image);
-            return Event.findByIdAndDelete(eventId);
-          });
-      } else {
-        clearImage(event.image);
-        return Event.findByIdAndDelete(eventId);
+      eventDoc = event;
+
+      // Delete associated hall reservation if it exists
+      return HallReservation.findOneAndDelete({ event: event._id });
+    })
+    .then((reservation) => {
+      // If a reservation existed, free the hall
+      if (reservation) {
+        return Hall.findById(reservation.hall).then((hall) => {
+          if (hall) {
+            hall.status = 'available';
+            return hall.save();
+          }
+        });
       }
     })
-    .then((result) => {
-      console.log(result);
-      res.status(200).json({ message: 'Event deleted successfully' });
+    .then(() => {
+      clearImage(eventDoc.image);
+
+      return Event.findByIdAndDelete(eventId);
+    })
+    .then(() => {
+      res.status(200).json({ message: 'Event deleted successfully.' });
     })
     .catch((err) => {
-      if (!err.statusCode) {
-        err.statusCode = 500;
-      }
+      if (!err.statusCode) err.statusCode = 500;
       next(err);
     });
 };

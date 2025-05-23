@@ -15,6 +15,8 @@ const EventSchema = new Schema(
       type: Date,
       required: true,
     },
+    startDate: { type: Date, required: true }, // hall reservation start
+    endDate: { type: Date, required: true }, // hall reservation end
     time: {
       type: String,
       required: true,

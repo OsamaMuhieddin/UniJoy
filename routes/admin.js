@@ -8,7 +8,7 @@ const User = require('../models/user');
 
 const router = express.Router();
 
-// PATCH /hosts/:hostId/status
+// PATCH /admin/hosts/:hostId/status
 router.patch(
   '/hosts/:hostId/status',
   [
@@ -22,6 +22,20 @@ router.patch(
       ),
   ],
   adminController.manageHostApproval
+);
+
+// PATCH /admin/events/:eventId/approve
+router.patch(
+  '/events/:eventId/approve',
+  [param('eventId').isMongoId().withMessage('Invalid event ID')],
+  adminController.approveEvent
+);
+
+// PATCH /admin/events/:eventId/reject
+router.patch(
+  '/events/:eventId/reject',
+  [param('eventId').isMongoId().withMessage('Invalid event ID')],
+  adminController.rejectEvent
 );
 
 module.exports = router;

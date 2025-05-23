@@ -8,6 +8,7 @@ const MongoDBStore = require('connect-mongodb-session')(session);
 const csrf = require('csurf');
 const flash = require('connect-flash');
 const multer = require('multer');
+const cron = require('node-cron');
 
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
@@ -126,5 +127,7 @@ mongoose
   .connect(MONGODB_URI)
   .then((result) => {
     app.listen(3000);
+
+    require('./jobs/freeExpiredHalls');
   })
   .catch((err) => console.log(err));
