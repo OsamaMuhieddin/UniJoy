@@ -40,9 +40,9 @@ router.post(
   authController.signUp
 );
 
-// POST /signin
+// POST /login
 router.post(
-  '/signin',
+  '/login',
   [
     body('email')
       .isEmail()

@@ -9,7 +9,7 @@ exports.signUp = (req, res, next) => {
   if (!errors.isEmpty()) {
     const error = new Error('Validation failed');
     errors.statusCode = 422;
-    error.data = error.array();
+    error.data = errors.array();
     throw error;
   }
   const email = req.body.email;
@@ -20,6 +20,12 @@ exports.signUp = (req, res, next) => {
 
   if (role !== 'user' && role !== 'host') {
     const error = new Error('Invalid role');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (role === 'host' && !hostCategory) {
+    const error = new Error('Host category is required for host accounts.');
     error.statusCode = 400;
     throw error;
   }
@@ -59,6 +65,14 @@ exports.signUp = (req, res, next) => {
 };
 
 exports.login = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
   const email = req.body.email;
   const password = req.body.password;
   let loadedUser;

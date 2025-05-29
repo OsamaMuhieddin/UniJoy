@@ -12,6 +12,14 @@ const HallReservation = require('../models/hallReservation');
 const { checkReservationConflict } = require('../util/conflictChecker');
 
 exports.manageHostApproval = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
   const hostId = req.params.hostId;
   const hostStatus = req.body.hostStatus;
 
@@ -44,6 +52,14 @@ exports.manageHostApproval = (req, res, next) => {
         throw error;
       }
 
+      if (user.role !== 'host') {
+        const error = new Error(
+          'User is not a host and cannot have host status updated.'
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
       user.hostStatus = hostStatus;
 
       return user.save();
@@ -63,6 +79,14 @@ exports.manageHostApproval = (req, res, next) => {
 };
 
 exports.approveEvent = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
   if (req.userRole !== 'admin') {
     const error = new Error('Not authorized. Only admins can approve events.');
     error.statusCode = 403;
@@ -161,6 +185,14 @@ exports.approveEvent = (req, res, next) => {
 };
 
 exports.rejectEvent = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
   if (req.userRole !== 'admin') {
     const error = new Error('Not authorized. Only admins can reject events.');
     error.statusCode = 403;

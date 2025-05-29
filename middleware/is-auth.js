@@ -11,14 +11,14 @@ module.exports = (req, res, next) => {
   //decode
   let decodedToken;
   try {
-    decodedToken = jwt.verify(token, 'somesupersecretsecret'); //decode and verify
+    decodedToken = jwt.verify(token, 'somesecret'); //decode and verify
   } catch (err) {
     err.statusCode = 500;
     throw err;
   }
   if (!decodedToken) {
     //undeifined
-    const error = new Error('Nor Authenticated');
+    const error = new Error('Not Authenticated');
     error.statusCode = 401;
     throw error;
   }

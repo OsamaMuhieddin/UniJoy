@@ -1,13 +1,13 @@
 const express = require('express');
 const { body } = require('express-validator');
 
-const hostController = require('../controllers/host');
+const eventController = require('../controllers/event');
 const isAuth = require('../middleware/is-auth');
 
 const router = express.Router();
 
 //GET /host/events
-router.get('/events', isAuth, hostController.getHostEvents);
+router.get('/events', isAuth, eventController.getHostEvents);
 
 //POST /host/events
 router.post(
@@ -51,7 +51,30 @@ router.post(
         }
         return true;
       }),
-
+    body('startDate')
+      .notEmpty()
+      .withMessage('startDate is required')
+      .custom((value) => {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid startDate');
+        }
+        return true;
+      }),
+    body('endDate')
+      .notEmpty()
+      .withMessage('endDate is required')
+      .custom((value, { req }) => {
+        const start = new Date(req.body.startDate);
+        const end = new Date(value);
+        if (isNaN(end.getTime())) {
+          throw new Error('Invalid endDate');
+        }
+        if (start >= end) {
+          throw new Error('endDate must be after startDate');
+        }
+        return true;
+      }),
     body('capacity')
       .trim()
       .isInt({ min: 1 })
@@ -75,11 +98,11 @@ router.post(
       .notEmpty()
       .withMessage('Category must not be empty'),
   ],
-  hostController.createEvent
+  eventController.createEvent
 );
 
 // GET /host/events/:eventId
-router.get('/events/:eventId', isAuth, hostController.getHostEvent);
+router.get('/events/:eventId', isAuth, eventController.getHostEvent);
 
 //PUT /host/events/:eventId
 router.put(
@@ -123,7 +146,30 @@ router.put(
         }
         return true;
       }),
-
+    body('startDate')
+      .notEmpty()
+      .withMessage('startDate is required')
+      .custom((value) => {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid startDate');
+        }
+        return true;
+      }),
+    body('endDate')
+      .notEmpty()
+      .withMessage('endDate is required')
+      .custom((value, { req }) => {
+        const start = new Date(req.body.startDate);
+        const end = new Date(value);
+        if (isNaN(end.getTime())) {
+          throw new Error('Invalid endDate');
+        }
+        if (start >= end) {
+          throw new Error('endDate must be after startDate');
+        }
+        return true;
+      }),
     body('capacity')
       .trim()
       .isInt({ min: 1 })
@@ -147,10 +193,10 @@ router.put(
       .notEmpty()
       .withMessage('Category must not be empty'),
   ],
-  hostController.updateEvent
+  eventController.updateEvent
 );
 
 //DELETE /host/events/:eventId
-router.delete('/events/:eventId', isAuth, hostController.deleteEvent);
+router.delete('/events/:eventId', isAuth, eventController.deleteEvent);
 
 module.exports = router;

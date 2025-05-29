@@ -12,7 +12,7 @@ const cron = require('node-cron');
 
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
-const hostRoutes = require('./routes/host');
+const eventManagementRoutes = require('./routes/event-management');
 const hallRoutes = require('./routes/hall');
 const hostCategoriesRoutes = require('./routes/hostCategory');
 
@@ -66,15 +66,15 @@ app.use((req, res, next) => {
     'Access-Control-Allow-Methods',
     'GET, POST, PUT, PATCH, DELETE'
   );
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Autherization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 });
 
 app.use('/admin', adminRoutes);
-app.use('/host', hostRoutes);
+app.use('/host', eventManagementRoutes);
 app.use('/auth', authRoutes);
 app.use('/halls', hallRoutes);
-app.use('host-categories', hostCategoriesRoutes);
+app.use('/host-categories', hostCategoriesRoutes);
 // app.use(
 //   session({
 //     secret: 'my secret ',
