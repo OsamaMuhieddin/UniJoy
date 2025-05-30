@@ -62,7 +62,7 @@ exports.createHall = (req, res, next) => {
     throw error;
   }
 
-  const name = req.file.name;
+  const name = req.body.name;
   const location = req.body.location;
   const capacity = req.body.capacity;
 

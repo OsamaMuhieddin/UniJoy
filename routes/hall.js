@@ -10,8 +10,10 @@ const router = express.Router();
 // Supports optional pagination with page and limit query params
 router.get('/', hallController.getHalls);
 
+//Get /halls/:hallId
 router.get('/:hallId', hallController.getHall);
 
+//Post /halls
 router.post(
   '/',
   isAuth,
@@ -23,6 +25,7 @@ router.post(
   hallController.createHall
 );
 
+//Put /halls/:hallId
 router.put(
   '/:hallId',
   isAuth,
@@ -38,6 +41,7 @@ router.put(
   hallController.updateHall
 );
 
+//Delete /halls/:hallId
 router.delete('/:hallId', isAuth, hallController.deleteHall);
 
 module.exports = router;

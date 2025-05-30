@@ -1,22 +1,25 @@
 const HallReservation = require('../models/hallReservation');
 const mongoose = require('mongoose');
-
 exports.checkReservationConflict = (
   hallId,
   startDate,
   endDate,
-  excludeReservationId
+  excludeEventId
 ) => {
   const query = {
-    hall: new mongoose.Types.ObjectId(hallId),
-    status: 'reserved', // Only check active reservations
-    $or: [
-      { startDate: { $lt: endDate }, endDate: { $gt: startDate } }, // overlap check
+    $and: [
+      { hall: new mongoose.Types.ObjectId(hallId) },
+      { status: 'reserved' },
+      {
+        $or: [{ startDate: { $lt: endDate }, endDate: { $gt: startDate } }],
+      },
     ],
   };
 
-  if (excludeReservationId) {
-    query._id = { $ne: new mongoose.Types.ObjectId(excludeReservationId) };
+  if (excludeEventId) {
+    query.$and.push({
+      event: { $ne: new mongoose.Types.ObjectId(excludeEventId) },
+    });
   }
 
   return HallReservation.findOne(query);

@@ -94,7 +94,7 @@ exports.approveEvent = (req, res, next) => {
   }
 
   const eventId = req.params.eventId;
-  let currentEvent; // Will store the event document for later use
+  let currentEvent; // Will hold the event after finding it
 
   Event.findById(eventId)
     .then((event) => {
@@ -110,20 +110,24 @@ exports.approveEvent = (req, res, next) => {
       }
 
       currentEvent = event;
-
+      // If no hall is reserved for this event,
+      // just approve the event without hall reservation
       if (!event.hall) {
-        // If no hall is reserved for this event,
-        // just approve the event without hall reservation
         event.status = 'approved';
-        return event.save();
+        return event.save().then((savedEvent) => {
+          res.status(200).json({
+            message: 'Event approved (no hall reservation needed)',
+            event: savedEvent,
+          });
+          return null;
+        });
       }
-
       // Check if the requested hall is free for the event's time slot
       return checkReservationConflict(
         event.hall,
         event.startDate,
         event.endDate,
-        currentEvent._id
+        event._id
       );
     })
     .then((conflict) => {
@@ -136,14 +140,31 @@ exports.approveEvent = (req, res, next) => {
         throw error;
       }
 
-      if (!currentEvent.hall) {
-        // If no hall (handled in previous step), return event directly
-        return currentEvent;
-      }
+      // Now check capacity vs hall capacity before reserving hall
+      return Hall.findById(currentEvent.hall).then((hall) => {
+        if (!currentEvent.hall) {
+          // Hall not set - already approved earlier
+          return currentEvent;
+        }
 
-      // Remove any existing reservation linked to this event (important for updates)
-      return HallReservation.findOneAndDelete({ event: currentEvent._id }).then(
-        () => {
+        if (!hall) {
+          const error = new Error('Associated hall not found');
+          error.statusCode = 404;
+          throw error;
+        }
+
+        if (currentEvent.capacity > hall.capacity) {
+          const error = new Error(
+            `Event capacity (${currentEvent.capacity}) exceeds hall capacity (${hall.capacity}).`
+          );
+          error.statusCode = 422;
+          throw error;
+        }
+
+        // Remove any existing reservation linked to this event (important for updates)
+        return HallReservation.findOneAndDelete({
+          event: currentEvent._id,
+        }).then(() => {
           // Create a new hall reservation for the event
           const reservation = new HallReservation({
             hall: currentEvent.hall,
@@ -156,23 +177,26 @@ exports.approveEvent = (req, res, next) => {
           currentEvent.status = 'approved';
 
           // Update hall status and save all changes
+          const hallUpdatePromise =
+            hall.status === 'available'
+              ? (() => {
+                  hall.status = 'reserved';
+                  return hall.save();
+                })()
+              : Promise.resolve();
+
           return Promise.all([
             reservation.save(),
-            Hall.findById(currentEvent.hall).then((hall) => {
-              if (!hall) {
-                const error = new Error('Associated hall not found');
-                error.statusCode = 404;
-                throw error;
-              }
-              hall.status = 'reserved';
-              return hall.save();
-            }),
+            hallUpdatePromise,
             currentEvent.save(),
           ]);
-        }
-      );
+        });
+      });
     })
-    .then(() => {
+    .then((result) => {
+      // Don’t respond again if early return was triggered
+      if (result === null) return;
+
       res.status(200).json({
         message: 'Event approved and hall reserved',
         event: currentEvent,
@@ -228,16 +252,23 @@ exports.rejectEvent = (req, res, next) => {
       // Event was approved and hall reserved, so delete reservation and free hall
       return HallReservation.findOneAndDelete({ event: eventId })
         .then(() => Hall.findById(event.hall))
-        .then((hall) => {
+        .then(async (hall) => {
           if (!hall) {
             const error = new Error('Associated hall not found');
             error.statusCode = 404;
             throw error;
           }
 
-          if (hall.status === 'reserved') {
+          //Check if other reservations exist before freeing hall
+          const otherReservations = await HallReservation.find({
+            hall: hall._id,
+            status: 'reserved',
+            event: { $ne: eventId },
+          });
+
+          if (otherReservations.length === 0 && hall.status === 'reserved') {
             hall.status = 'available';
-            return hall.save();
+            await hall.save();
           }
         })
         .then(() => {
@@ -248,7 +279,8 @@ exports.rejectEvent = (req, res, next) => {
     })
     .then(() => {
       res.status(200).json({
-        message: 'Event rejected and hall freed if reserved',
+        message:
+          'Event rejected and hall freed if reserved with no other reservations',
         event: currentEvent,
       });
     })

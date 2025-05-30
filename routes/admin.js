@@ -27,6 +27,7 @@ router.patch(
 // PATCH /admin/events/:eventId/approve
 router.patch(
   '/events/:eventId/approve',
+  isAuth,
   [param('eventId').isMongoId().withMessage('Invalid event ID')],
   adminController.approveEvent
 );
@@ -34,6 +35,7 @@ router.patch(
 // PATCH /admin/events/:eventId/reject
 router.patch(
   '/events/:eventId/reject',
+  isAuth,
   [param('eventId').isMongoId().withMessage('Invalid event ID')],
   adminController.rejectEvent
 );

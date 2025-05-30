@@ -10,6 +10,14 @@ const Hall = require('../models/hall');
 const HallReservation = require('../models/hallReservation');
 
 exports.getHostEvents = (req, res, next) => {
+  if (req.userRole !== 'host') {
+    const error = new Error(
+      'Not authorized. Only hosts can view their events.'
+    );
+    error.statusCode = 403;
+    return next(error);
+  }
+
   const currentPage = parseInt(req.query.page) || 1;
   const perPage = parseInt(req.query.perPage) || 2;
 
@@ -39,6 +47,9 @@ exports.getHostEvents = (req, res, next) => {
 exports.createEvent = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    if (req.file) {
+      clearImage(req.file.path);
+    }
     const error = new Error('Valdation failed, Entered data is incorrect');
     error.statusCode = 422;
     throw error;
@@ -180,20 +191,18 @@ exports.updateEvent = (req, res, next) => {
   const description = req.body.description;
   const date = req.body.date;
   const time = req.body.time;
+  const startDate = req.body.startDate;
+  const endDate = req.body.endDate;
   const capacity = req.body.capacity;
   const location = req.body.location;
   const price = req.body.price;
   const hall = req.body.hall;
   const category = req.body.category;
-  let image = req.file.path;
+  let image;
   if (req.file) {
     image = req.file.path;
   }
-  if (!image) {
-    const error = new Error('No file picked');
-    error.statusCode = 422;
-    throw error;
-  }
+
   let eventDoc;
   Event.findById(eventId)
     .then((event) => {
@@ -202,6 +211,12 @@ exports.updateEvent = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+      if (!image && !event.image) {
+        const error = new Error('No file picked');
+        error.statusCode = 422;
+        throw error;
+      }
+
       // Role check: must be host or admin
       if (event.host.toString() !== req.userId && req.userRole !== 'admin') {
         const error = new Error('Not authorized to update this event.');
@@ -225,7 +240,7 @@ exports.updateEvent = (req, res, next) => {
           hall,
           new Date(req.body.startDate),
           new Date(req.body.endDate),
-          event.hallReservationId // Assuming event stores the reservation id, else null
+          event._id //exclude current event from check
         ).then((conflict) => {
           if (conflict) {
             const error = new Error(
@@ -241,7 +256,7 @@ exports.updateEvent = (req, res, next) => {
     })
     .then(() => {
       // Update image if changed
-      if (image !== eventDoc.image) {
+      if (image) {
         clearImage(eventDoc.image);
         eventDoc.image = image;
       }
@@ -266,44 +281,55 @@ exports.updateEvent = (req, res, next) => {
         req.body.endDate &&
         new Date(req.body.endDate).getTime() !== eventDoc.endDate.getTime();
 
+      // If hall/time changed and event was approved, mark as pending and delete reservation
       if (hallChanged || startDateChanged || endDateChanged) {
         if (eventDoc.status === 'approved') {
           eventDoc.status = 'pending'; // Revert for re-approval
           // Remove previous hall reservation if exists
           return HallReservation.findOneAndDelete({ event: eventDoc._id })
             .then(() => {
-              // Free old hall if exists
+              // Only free old hall if no other reservation exists for it
               if (eventDoc.hall) {
-                return Hall.findById(eventDoc.hall).then((oldHall) => {
-                  if (oldHall) {
-                    oldHall.status = 'available';
-                    return oldHall.save();
+                return HallReservation.findOne({
+                  hall: eventDoc.hall,
+                  status: 'reserved',
+                  event: { $ne: eventDoc._id },
+                }).then((otherReservation) => {
+                  if (!otherReservation) {
+                    return Hall.findById(eventDoc.hall).then((oldHall) => {
+                      if (oldHall) {
+                        oldHall.status = 'available';
+                        return oldHall.save();
+                      }
+                    });
                   }
                 });
               }
             })
             .then(() => {
+              // Update hall and reservation dates
               eventDoc.hall = hall || null;
-              eventDoc.startDate = new Date(req.body.startDate);
-              eventDoc.endDate = new Date(req.body.endDate);
+              eventDoc.startDate = new Date(startDate);
+              eventDoc.endDate = new Date(endDate);
               return eventDoc.save();
             });
         } else {
-          // If event not approved, just update hall and dates
+          // Not approved: just update hall and dates
           eventDoc.hall = hall || null;
-          eventDoc.startDate = new Date(req.body.startDate);
-          eventDoc.endDate = new Date(req.body.endDate);
+          eventDoc.startDate = new Date(startDate);
+          eventDoc.endDate = new Date(endDate);
           return eventDoc.save();
         }
-      } else {
-        // Hall/time unchanged, just update other fields
-        return eventDoc.save();
       }
+
+      // No hall/date/time change: just save
+      return eventDoc.save();
     })
     .then((result) => {
-      res
-        .status(200)
-        .json({ message: 'Event updated successfully.', event: result });
+      res.status(200).json({
+        message: 'Event updated successfully.',
+        event: result,
+      });
     })
     .catch((err) => {
       if (!err.statusCode) err.statusCode = 500;
@@ -333,13 +359,23 @@ exports.deleteEvent = (req, res, next) => {
       return HallReservation.findOneAndDelete({ event: event._id });
     })
     .then((reservation) => {
-      // If a reservation existed, free the hall
       if (reservation) {
-        return Hall.findById(reservation.hall).then((hall) => {
-          if (hall) {
-            hall.status = 'available';
-            return hall.save();
+        return HallReservation.find({
+          hall: reservation.hall,
+          status: 'reserved',
+          event: { $ne: reservation.event },
+        }).then((otherReservations) => {
+          if (otherReservations.length === 0) {
+            // No other reservations exist, free the hall
+            return Hall.findById(reservation.hall).then((hall) => {
+              if (hall) {
+                hall.status = 'available';
+                return hall.save();
+              }
+            });
           }
+          // Other reservations exist, do not free hall
+          return Promise.resolve();
         });
       }
     })
