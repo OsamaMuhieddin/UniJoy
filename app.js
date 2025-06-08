@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const path = require('path');
 
 const express = require('express');
@@ -15,6 +17,9 @@ const authRoutes = require('./routes/auth');
 const eventManagementRoutes = require('./routes/event-management');
 const hallRoutes = require('./routes/hall');
 const hostCategoriesRoutes = require('./routes/hostCategory');
+const eventRoutes = require('./routes/event');
+const userRoutes = require('./routes/user');
+const profileRoutes = require('./routes/profile');
 
 const User = require('./models/user');
 
@@ -75,6 +80,9 @@ app.use('/host', eventManagementRoutes);
 app.use('/auth', authRoutes);
 app.use('/halls', hallRoutes);
 app.use('/host-categories', hostCategoriesRoutes);
+app.use('/events', eventRoutes);
+app.use('/user', userRoutes);
+app.use('/profile', profileRoutes);
 // app.use(
 //   session({
 //     secret: 'my secret ',

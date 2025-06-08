@@ -20,14 +20,26 @@ exports.getHostEvents = (req, res, next) => {
 
   const currentPage = parseInt(req.query.page) || 1;
   const perPage = parseInt(req.query.perPage) || 2;
+  const filterType = req.query.type; // "upcoming", "past", or undefined
+  const now = new Date();
+
+  // Base filter: events by this host
+  let filter = { host: req.userId };
+
+  // Add date filter based on type
+  if (filterType === 'upcoming') {
+    filter.endDate = { $gte: now };
+  } else if (filterType === 'past') {
+    filter.endDate = { $lt: now };
+  }
 
   let totalItems;
 
-  Event.find({ host: req.userId })
+  Event.find(filter)
     .countDocuments()
     .then((count) => {
       totalItems = count;
-      return Event.find({ host: req.userId })
+      return Event.find(filter)
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -36,6 +48,8 @@ exports.getHostEvents = (req, res, next) => {
         message: 'Fetched events successfully',
         events: events,
         totalItems: totalItems,
+        currentPage: currentPage,
+        totalPages: Math.ceil(totalItems / perPage),
       });
     })
     .catch((err) => {
@@ -386,6 +400,65 @@ exports.deleteEvent = (req, res, next) => {
     })
     .then(() => {
       res.status(200).json({ message: 'Event deleted successfully.' });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
+      next(err);
+    });
+};
+
+exports.getAllEvents = (req, res, next) => {
+  const currentPage = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.perPage) || 10;
+  const filterType = req.query.type; // "upcoming", "past", or undefined
+  const now = new Date();
+
+  // Base filter: only approved events
+  let filter = { status: 'approved' };
+
+  // Add date filter based on type
+  if (filterType === 'upcoming') {
+    filter.endDate = { $gte: now };
+  } else if (filterType === 'past') {
+    filter.endDate = { $lt: now };
+  }
+
+  let totalItems;
+
+  Event.find(filter)
+    .countDocuments()
+    .then((count) => {
+      totalItems = count;
+      return Event.find(filter)
+        .skip((currentPage - 1) * perPage)
+        .limit(perPage);
+    })
+    .then((events) => {
+      res.status(200).json({
+        message: 'Fetched public events successfully',
+        events: events,
+        totalItems: totalItems,
+      });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
+      next(err);
+    });
+};
+
+exports.getSingleEvent = (req, res, next) => {
+  const eventId = req.params.eventId;
+
+  Event.findOne({ _id: eventId, status: 'approved' })
+    .then((event) => {
+      if (!event) {
+        const error = new Error('Event not found or not approved');
+        error.statusCode = 404;
+        throw error;
+      }
+      res
+        .status(200)
+        .json({ message: 'Event fetched successfully', event: event });
     })
     .catch((err) => {
       if (!err.statusCode) err.statusCode = 500;

@@ -17,6 +17,7 @@ exports.signUp = (req, res, next) => {
   const password = req.body.password;
   const role = req.body.role;
   const hostCategory = req.body.hostCategory;
+  const profileInfo = req.body.profileInfo;
 
   if (role !== 'user' && role !== 'host') {
     const error = new Error('Invalid role');
@@ -24,8 +25,8 @@ exports.signUp = (req, res, next) => {
     throw error;
   }
 
-  if (role === 'host' && !hostCategory) {
-    const error = new Error('Host category is required for host accounts.');
+   if (role === 'host' && (!hostCategory || !profileInfo)) {
+    const error = new Error('Host category and profile info are required for host accounts.');
     error.statusCode = 400;
     throw error;
   }
@@ -40,6 +41,7 @@ exports.signUp = (req, res, next) => {
         role: role,
         hostStatus: role === 'host' ? 'pending' : undefined,
         hostCategory: role === 'host' ? hostCategory : undefined,
+        profileInfo: role === 'host' ? profileInfo : undefined,
       });
       return user.save();
     })

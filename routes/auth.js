@@ -4,7 +4,6 @@ const { body, param } = require('express-validator');
 const isAuth = require('../middleware/is-auth');
 
 const authController = require('../controllers/auth');
-const User = require('../models/user');
 
 const router = express.Router();
 
@@ -32,10 +31,26 @@ router.post(
       .isLength({ min: 6 })
       .isAlphanumeric()
       .withMessage('Password must be at least 6 characters long'),
-    body('name').not().isEmpty().withMessage('Name is required'),
+    body('name')
+      .not()
+      .isEmpty()
+      .isLength({ min: 3 })
+      .isAlphanumeric()
+      .withMessage('Name is required'),
     body('role')
       .isIn(['user', 'host'])
       .withMessage('Role must be either user or host'),
+    body('hostCategory')
+      .if(body('role').equals('host'))
+      .isLength({ min: 3 })
+      .notEmpty()
+      .withMessage('Host category is required for hosts'),
+
+    body('profileInfo')
+      .if(body('role').equals('host'))
+      .isLength({ min: 6 })
+      .notEmpty()
+      .withMessage('Profile info is required for hosts'),
   ],
   authController.signUp
 );
