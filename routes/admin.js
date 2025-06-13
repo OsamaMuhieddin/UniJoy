@@ -40,4 +40,15 @@ router.patch(
   adminController.rejectEvent
 );
 
+// GET /admin/users
+router.get('/users', isAuth, adminController.getAllUsers);
+
+// DELETE /admin/users/:userId
+router.delete(
+  '/users/:userId',
+  isAuth,
+  param('userId').isMongoId().withMessage('Invalid user ID'),
+  adminController.deleteUser
+);
+
 module.exports = router;

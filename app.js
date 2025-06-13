@@ -20,6 +20,7 @@ const hostCategoriesRoutes = require('./routes/hostCategory');
 const eventRoutes = require('./routes/event');
 const userRoutes = require('./routes/user');
 const profileRoutes = require('./routes/profile');
+const reportRoutes = require('./routes/report');
 
 const User = require('./models/user');
 
@@ -83,6 +84,8 @@ app.use('/host-categories', hostCategoriesRoutes);
 app.use('/events', eventRoutes);
 app.use('/user', userRoutes);
 app.use('/profile', profileRoutes);
+app.use('/report', reportRoutes);
+
 // app.use(
 //   session({
 //     secret: 'my secret ',

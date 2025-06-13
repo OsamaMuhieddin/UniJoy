@@ -4,10 +4,11 @@ const { body, param } = require('express-validator');
 const isAuth = require('../middleware/is-auth');
 
 const authController = require('../controllers/auth');
+const User = require('../models/user');
 
 const router = express.Router();
 
-// POST /signup
+// POST /auth/signup
 router.post(
   '/signup',
   [
@@ -55,7 +56,7 @@ router.post(
   authController.signUp
 );
 
-// POST /login
+// POST /auth/login
 router.post(
   '/login',
   [
@@ -69,6 +70,26 @@ router.post(
       .trim(),
   ],
   authController.login
+);
+
+// POST /auth/reset-password
+router.post(
+  '/reset-password',
+  [body('email').isEmail().withMessage('Please enter a valid email')],
+  authController.postReset
+);
+
+// POST /auth/new-password
+router.post(
+  '/new-password',
+  [
+    body('password')
+      .trim()
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters long'),
+    body('token').notEmpty().withMessage('Reset token is required'),
+  ],
+  authController.postNewPassword
 );
 
 module.exports = router;

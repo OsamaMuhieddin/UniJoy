@@ -46,6 +46,8 @@ const userSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'HostCategory',
     },
+    resetToken: String,
+    resetTokenExpiration: Date,
   },
   { timestamps: true }
 );

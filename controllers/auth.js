@@ -1,8 +1,22 @@
 const { validationResult } = require('express-validator');
+
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const nodemailer = require('nodemailer');
+const sendgridTransport = require('nodemailer-sendgrid-transport');
+
 const User = require('../models/user');
+
+// Setup transporter with SendGrid, reading API key from env
+const transporter = nodemailer.createTransport(
+  sendgridTransport({
+    auth: {
+      api_key: process.env.SENDGRID_API_KEY, // API key stored in environment variable
+    },
+  })
+);
 
 exports.signUp = (req, res, next) => {
   const errors = validationResult(req);
@@ -25,8 +39,10 @@ exports.signUp = (req, res, next) => {
     throw error;
   }
 
-   if (role === 'host' && (!hostCategory || !profileInfo)) {
-    const error = new Error('Host category and profile info are required for host accounts.');
+  if (role === 'host' && (!hostCategory || !profileInfo)) {
+    const error = new Error(
+      'Host category and profile info are required for host accounts.'
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -124,6 +140,106 @@ exports.login = (req, res, next) => {
       if (!err.statusCode) {
         err.statusCode = 500;
       }
+      next(err);
+    });
+};
+
+exports.postReset = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
+  crypto.randomBytes(32, (err, buffer) => {
+    if (err) {
+      err.statusCode = 500;
+      return next(err);
+    }
+
+    const token = buffer.toString('hex'); // Generate secure reset token
+
+    User.findOne({ email: req.body.email })
+      .then((user) => {
+        if (!user) {
+          const error = new Error('No account with that email found.');
+          error.statusCode = 404;
+          throw error;
+        }
+
+        // Set reset token and expiration on user document
+        user.resetToken = token;
+        user.resetTokenExpiration = Date.now() + 3600000; // 1 hour expiry
+
+        return user.save();
+      })
+      .then(() => {
+        // Send password reset email
+        return transporter.sendMail({
+          to: req.body.email,
+          from: 'osama.tm.royale@gmail.com',
+          subject: 'Password Reset Request',
+          html: `
+            <p>You requested a password reset</p>
+            <p>Click this <a href="http://localhost:3000/reset-password/${token}">link</a> to set a new password.</p> /
+            <p>If you did not request this, please ignore this email.</p>
+          `,
+        }); //front end domain
+      })
+      .then(() => {
+        res.status(200).json({ message: 'Password reset email sent.' });
+      })
+      .catch((err) => {
+        if (!err.statusCode) err.statusCode = 500;
+        next(err);
+      });
+  });
+};
+
+exports.postNewPassword = (req, res, next) => {
+  // Validate new password and token in request body
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed');
+    error.statusCode = 422;
+    error.data = errors.array();
+    return next(error);
+  }
+
+  const newPassword = req.body.password;
+  const passwordToken = req.body.token;
+
+  let resetUser;
+
+  User.findOne({
+    resetToken: passwordToken,
+    resetTokenExpiration: { $gt: Date.now() }, // Token not expired
+  })
+    .then((user) => {
+      if (!user) {
+        const error = new Error('Invalid or expired token.');
+        error.statusCode = 400;
+        throw error;
+      }
+      resetUser = user;
+      return bcrypt.hash(newPassword, 12);
+    })
+    .then((hashedPassword) => {
+      // Update password and clear reset fields
+      resetUser.password = hashedPassword;
+      resetUser.resetToken = undefined;
+      resetUser.resetTokenExpiration = undefined;
+      return resetUser.save();
+    })
+    .then(() => {
+      res
+        .status(200)
+        .json({ message: 'Password has been reset successfully.' });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
       next(err);
     });
 };

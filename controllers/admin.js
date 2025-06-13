@@ -289,3 +289,78 @@ exports.rejectEvent = (req, res, next) => {
       next(err);
     });
 };
+
+// Admin-only: List all non-admin users (roles: user, host)
+exports.getAllUsers = (req, res, next) => {
+  if (req.userRole !== 'admin') {
+    const error = new Error('Not authorized. Only admins can view users.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // Fetch users excluding admins
+  User.find({ role: { $in: ['user', 'host'] } })
+    .select('name email role hostStatus') // Select only necessary fields
+    .then((users) => {
+      res.status(200).json({
+        message: 'Users fetched successfully.',
+        users,
+      });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
+      next(err);
+    });
+};
+
+// Admin-only: Delete user or host, NOT other admins or self
+exports.deleteUser = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed.');
+    error.statusCode = 422;
+    error.data = errors.array();
+    throw error;
+  }
+
+  // Check admin authorization
+  if (req.userRole !== 'admin') {
+    const error = new Error('Not authorized. Only admins can delete users.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const userIdToDelete = req.params.userId;
+
+  // Prevent self-deletion
+  if (userIdToDelete === req.userId) {
+    const error = new Error('You cannot delete your own account.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  User.findById(userIdToDelete)
+    .then((user) => {
+      if (!user) {
+        const error = new Error('User not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Prevent deletion of admin users
+      if (user.role === 'admin') {
+        const error = new Error('Cannot delete admin users.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      return User.findByIdAndDelete(userIdToDelete);
+    })
+    .then(() => {
+      res.status(200).json({ message: 'User deleted successfully.' });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
+      next(err);
+    });
+};

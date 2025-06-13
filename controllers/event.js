@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const PDFDocument = require('pdfkit');
 const { validationResult } = require('express-validator');
 const { checkReservationConflict } = require('../util/conflictChecker');
 
@@ -459,6 +460,117 @@ exports.getSingleEvent = (req, res, next) => {
       res
         .status(200)
         .json({ message: 'Event fetched successfully', event: event });
+    })
+    .catch((err) => {
+      if (!err.statusCode) err.statusCode = 500;
+      next(err);
+    });
+};
+
+exports.getInvoice = (req, res, next) => {
+  const eventId = req.params.eventId;
+  const userId = req.userId;
+  const userRole = req.userRole;
+
+  if (userRole !== 'user') {
+    const error = new Error(
+      'Only users can generate invoices for event registrations.'
+    );
+    error.statusCode = 403;
+    return next(error);
+  }
+
+  Event.findOne({ _id: eventId, status: 'approved' })
+    .populate({
+      path: 'host',
+      select: 'name email role hostCategory',
+      populate: {
+        path: 'hostCategory',
+        select: 'name',
+      },
+    })
+    .then((event) => {
+      if (!event) {
+        const error = new Error('Event not found or not approved.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Check if user is registered for this event
+      const isRegistered = event.registeredUsers?.includes(userId);
+      if (!isRegistered) {
+        const error = new Error('You are not registered for this event.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      // If price is free (0, undefined, or null)
+      if (!event.price || event.price === 0) {
+        const error = new Error('This is a free event. No invoice available.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Find the corresponding payment
+      return Payment.findOne({
+        user: userId,
+        event: eventId,
+        status: 'completed',
+      }).then((payment) => {
+        if (!payment) {
+          const error = new Error('Payment not found.');
+          error.statusCode = 404;
+          throw error;
+        }
+        // Generate PDF invoice
+        const invoiceName = `invoice-${eventId}-${userId}.pdf`;
+        const invoicePath = path.join('data', 'invoices', invoiceName);
+
+        const pdfDoc = new PDFDocument();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `inline; filename="${invoiceName}"`
+        );
+
+        pdfDoc.pipe(fs.createWriteStream(invoicePath));
+        pdfDoc.pipe(res);
+
+        pdfDoc.fontSize(20).text('Event Invoice', { underline: true });
+        pdfDoc.moveDown();
+
+        // Event Info
+        pdfDoc.fontSize(14).text(`Event: ${event.title}`);
+        pdfDoc.text(`Date: ${new Date(event.date).toLocaleString()}`);
+        pdfDoc.text(`Price: $${(event.price / 100).toFixed(2)}`);
+        pdfDoc.moveDown();
+
+        // Host/Admin Info
+        if (event.host) {
+          pdfDoc.text(`Created By: ${event.host.name}`);
+          pdfDoc.text(`Email: ${event.host.email}`);
+          pdfDoc.text(`Role: ${event.host.role}`);
+
+          if (
+            event.host.role === 'host' &&
+            event.host.hostCategory &&
+            event.host.hostCategory.name
+          ) {
+            pdfDoc.text(`Organization: ${event.host.hostCategory.name}`);
+          }
+
+          pdfDoc.moveDown();
+        }
+
+        // Payment Info
+        pdfDoc.text(`Payment ID: ${payment._id}`);
+        pdfDoc.text(`Stripe Payment Intent: ${payment.stripePaymentIntentId}`);
+        pdfDoc.text(`Amount Paid: $${(payment.amount / 100).toFixed(2)}`);
+        pdfDoc.text(`Status: ${payment.status}`);
+        pdfDoc.text(`Date: ${new Date(payment.createdAt).toLocaleString()}`);
+
+        pdfDoc.end();
+      });
     })
     .catch((err) => {
       if (!err.statusCode) err.statusCode = 500;
