@@ -5,7 +5,7 @@ const reportController = require('../controllers/report');
 
 const router = express.Router();
 
-// GET /report/event/:eventId
+// GET /reports/event/:eventId
 router.get('/event/:eventId', isAuth, reportController.generateEventReport);
 
 module.exports = router;

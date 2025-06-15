@@ -7,17 +7,17 @@ const isAuth = require('../middleware/is-auth');
 
 const router = express.Router();
 
-// POST /user/events/:eventId/register
+// POST /users/me/events/:eventId/register
 router.post(
-  '/events/:eventId/register',
+  '/me/events/:eventId/register',
   isAuth,
   [param('eventId').isMongoId().withMessage('Invalid event ID')],
   userController.registerForEvent
 );
 
-// POST /user/events/:eventId/confirm
+// POST /users/me/events/:eventId/confirm
 router.post(
-  '/events/:eventId/confirm',
+  '/me/events/:eventId/confirm',
   isAuth,
   [
     param('eventId').isMongoId().withMessage('Invalid event ID'),
@@ -29,24 +29,24 @@ router.post(
   userController.confirmRegistration
 );
 
-// DELETE /user/events/:eventId/unregister
+// DELETE /user/me/events/:eventId/unregister
 router.delete(
-  '/events/:eventId/unregister',
+  '/me/events/:eventId/unregister',
   isAuth,
   [param('eventId').isMongoId().withMessage('Invalid event ID')],
   userController.unregisterForEvent
 );
 
-// GET /user/registered-events?page=1&perPage=5
+// GET /users/me/registered-events?page=1&perPage=5&type=upcoming
 router.get(
-  '/registered-events',
-  isAuth,
+  '/me/registered-events',
+  isAuth, // Auth middleware that populates req.userId and req.userRole
   userController.getUserRegisteredEvents
 );
 
-// GET /user/registered-events/:eventId
+// GET /users/me/registered-events/:eventId
 router.get(
-  '/registered-events/:eventId',
+  '/me/registered-events/:eventId',
   isAuth,
   userController.getUserRegisteredEvent
 );

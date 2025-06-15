@@ -6,7 +6,7 @@ const eventController = require('../controllers/event');
 
 const router = express.Router();
 // Public routes for events
-// GET /events  - get all approved events
+// GET /events?page=1&perPage=10&type=upcoming  - get all approved events
 router.get('/', eventController.getAllEvents);
 
 // GET /events/:eventId - get a single approved event

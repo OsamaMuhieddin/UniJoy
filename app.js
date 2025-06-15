@@ -82,9 +82,9 @@ app.use('/auth', authRoutes);
 app.use('/halls', hallRoutes);
 app.use('/host-categories', hostCategoriesRoutes);
 app.use('/events', eventRoutes);
-app.use('/user', userRoutes);
+app.use('/users', userRoutes);
 app.use('/profile', profileRoutes);
-app.use('/report', reportRoutes);
+app.use('/reports', reportRoutes);
 
 // app.use(
 //   session({

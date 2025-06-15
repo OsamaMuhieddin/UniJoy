@@ -65,9 +65,9 @@ router.post(
       .withMessage('Please enter a valid email address.')
       .normalizeEmail(),
     body('password', 'Password has to be valid.')
+      .trim()
       .isLength({ min: 6 })
-      .isAlphanumeric()
-      .trim(),
+      .isAlphanumeric(),
   ],
   authController.login
 );
@@ -86,6 +86,7 @@ router.post(
     body('password')
       .trim()
       .isLength({ min: 6 })
+      .isAlphanumeric()
       .withMessage('Password must be at least 6 characters long'),
     body('token').notEmpty().withMessage('Reset token is required'),
   ],

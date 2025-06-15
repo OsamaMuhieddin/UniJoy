@@ -6,7 +6,7 @@ const isAuth = require('../middleware/is-auth');
 
 const router = express.Router();
 
-//GET /host/events
+// GET /host/events?page=1&perPage=5&type=upcoming
 router.get('/events', isAuth, eventController.getHostEvents);
 
 //POST /host/events
