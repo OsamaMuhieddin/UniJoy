@@ -4,6 +4,8 @@ const { body, param } = require('express-validator');
 const isAuth = require('../middleware/is-auth');
 
 const adminController = require('../controllers/admin');
+const eventController = require('../controllers/event');
+
 const User = require('../models/user');
 
 const router = express.Router();
@@ -50,5 +52,8 @@ router.delete(
   param('userId').isMongoId().withMessage('Invalid user ID'),
   adminController.deleteUser
 );
+
+// GET /admin/events?page=1&perPage=10&type=upcoming //or past - get all events regardless of status
+router.get('/events', eventController.getAllEvents);
 
 module.exports = router;
