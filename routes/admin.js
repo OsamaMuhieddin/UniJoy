@@ -56,4 +56,7 @@ router.delete(
 // GET /admin/events?page=1&perPage=10&type=upcoming //or past - get all events regardless of status
 router.get('/events', isAuth, eventController.getAllEvents);
 
+// GET /admin/events/:eventId
+router.get('/events/:eventId', isAuth, eventController.getSingleEvent);
+
 module.exports = router;

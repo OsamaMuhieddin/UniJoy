@@ -11,7 +11,7 @@ const router = express.Router();
 router.get('/', eventController.getAllApprovedEvents);
 
 // GET /events/:eventId - get a single approved event
-router.get('/:eventId', eventController.getSingleEvent);
+router.get('/:eventId', eventController.getSingleApprovedEvent);
 
 // GET /events/:eventId/invoice
 router.get('/:eventId/invoice', isAuth, eventController.getInvoice);

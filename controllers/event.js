@@ -447,7 +447,7 @@ exports.getAllApprovedEvents = (req, res, next) => {
     });
 };
 
-exports.getSingleEvent = (req, res, next) => {
+exports.getSingleApprovedEvent = (req, res, next) => {
   const eventId = req.params.eventId;
 
   Event.findOne({ _id: eventId, status: 'approved' })
@@ -509,16 +509,14 @@ exports.getAllEvents = (req, res, next) => {
 exports.getSingleEvent = (req, res, next) => {
   const eventId = req.params.eventId;
 
-  Event.findOne({ _id: eventId, status: 'approved' })
+  Event.findById(eventId)
     .then((event) => {
       if (!event) {
-        const error = new Error('Event not found or not approved');
+        const error = new Error('Event not found');
         error.statusCode = 404;
         throw error;
       }
-      res
-        .status(200)
-        .json({ message: 'Event fetched successfully', event: event });
+      res.status(200).json({ message: 'Event fetched successfully', event });
     })
     .catch((err) => {
       if (!err.statusCode) err.statusCode = 500;

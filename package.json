@@ -38,6 +38,8 @@
     "pdfkit": "^0.16.0",
     "prettier": "^3.5.3",
     "pug": "^3.0.3",
-    "stripe": "^18.0.0"
+    "stripe": "^18.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }
