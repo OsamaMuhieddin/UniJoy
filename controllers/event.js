@@ -468,6 +468,12 @@ exports.getSingleApprovedEvent = (req, res, next) => {
 };
 
 exports.getAllEvents = (req, res, next) => {
+  if (req.userRole !== 'admin') {
+    const error = new Error('Not authorized. Only admins can view all events.');
+    error.statusCode = 403;
+    return next(error);
+  }
+
   const currentPage = parseInt(req.query.page) || 1;
   const perPage = parseInt(req.query.perPage) || 10;
   const filterType = req.query.type; // "upcoming", "past", or undefined
@@ -495,9 +501,11 @@ exports.getAllEvents = (req, res, next) => {
     })
     .then((events) => {
       res.status(200).json({
-        message: 'Fetched public events successfully',
+        message: 'Fetched events successfully',
         events: events,
         totalItems: totalItems,
+        currentPage: currentPage,
+        totalPages: Math.ceil(totalItems / perPage),
       });
     })
     .catch((err) => {
@@ -507,6 +515,14 @@ exports.getAllEvents = (req, res, next) => {
 };
 
 exports.getSingleEvent = (req, res, next) => {
+  if (req.userRole !== 'admin') {
+    const error = new Error(
+      'Not authorized. Only admins can view event details.'
+    );
+    error.statusCode = 403;
+    return next(error);
+  }
+
   const eventId = req.params.eventId;
 
   Event.findById(eventId)
