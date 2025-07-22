@@ -4,11 +4,13 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const { validationResult } = require('express-validator');
 const { checkReservationConflict } = require('../util/conflictChecker');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Stripe secret key
 
 const Event = require('../models/event');
 const User = require('../models/user');
 const Hall = require('../models/hall');
 const HallReservation = require('../models/hallReservation');
+const Payment = require('../models/payment');
 
 exports.getHostEvents = (req, res, next) => {
   if (req.userRole !== 'host') {

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Stripe secret key
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 
@@ -9,6 +10,8 @@ const User = require('../models/user');
 const Hall = require('../models/hall');
 const HostCategory = require('../models/hostCategory');
 const HallReservation = require('../models/hallReservation');
+const Payment = require('../models/payment');
+
 const { checkReservationConflict } = require('../util/conflictChecker');
 
 exports.manageHostApproval = (req, res, next) => {
@@ -313,54 +316,92 @@ exports.getAllUsers = (req, res, next) => {
     });
 };
 
-// Admin-only: Delete user or host, NOT other admins or self
-exports.deleteUser = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const error = new Error('Validation failed.');
-    error.statusCode = 422;
-    error.data = errors.array();
-    throw error;
-  }
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error = new Error('Validation failed.');
+      error.statusCode = 422;
+      error.data = errors.array();
+      throw error;
+    }
 
-  // Check admin authorization
-  if (req.userRole !== 'admin') {
-    const error = new Error('Not authorized. Only admins can delete users.');
-    error.statusCode = 403;
-    throw error;
-  }
+    // Only admins can delete users
+    if (req.userRole !== 'admin') {
+      const error = new Error('Not authorized. Only admins can delete users.');
+      error.statusCode = 403;
+      throw error;
+    }
 
-  const userIdToDelete = req.params.userId;
+    const userIdToDelete = req.params.userId;
 
-  // Prevent self-deletion
-  if (userIdToDelete === req.userId) {
-    const error = new Error('You cannot delete your own account.');
-    error.statusCode = 403;
-    throw error;
-  }
+    // Prevent deleting own account
+    if (userIdToDelete === req.userId) {
+      const error = new Error('You cannot delete your own account.');
+      error.statusCode = 403;
+      throw error;
+    }
 
-  User.findById(userIdToDelete)
-    .then((user) => {
-      if (!user) {
-        const error = new Error('User not found.');
-        error.statusCode = 404;
+    // Find the user by ID
+    const user = await User.findById(userIdToDelete);
+    if (!user) {
+      const error = new Error('User not found.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Prevent deletion of admin users
+    if (user.role === 'admin') {
+      const error = new Error('Cannot delete admin users.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    // If user is a host, check if they have any APPROVED events
+    if (user.role === 'host') {
+      const approvedEventsCount = await Event.countDocuments({
+        host: userIdToDelete,
+        status: 'approved',
+      });
+      if (approvedEventsCount > 0) {
+        const error = new Error('Cannot delete host with approved events.');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // If user is a regular user, check for paid event registrations with completed payments
+    if (user.role === 'user') {
+      const paidPayment = await Payment.findOne({
+        user: userIdToDelete,
+        status: 'completed',
+      }).populate({
+        path: 'event',
+        match: { price: { $gt: 0 } }, // Only paid events
+        select: '_id',
+      });
+
+      if (paidPayment && paidPayment.event) {
+        const error = new Error(
+          'Cannot delete user registered for paid events with completed payments. Refund or unregister first.'
+        );
+        error.statusCode = 400;
         throw error;
       }
 
-      // Prevent deletion of admin users
-      if (user.role === 'admin') {
-        const error = new Error('Cannot delete admin users.');
-        error.statusCode = 403;
-        throw error;
-      }
+      // Remove user from registeredUsers arrays in all events (mostly free events)
+      await Event.updateMany(
+        { registeredUsers: userIdToDelete },
+        { $pull: { registeredUsers: userIdToDelete } }
+      );
+    }
 
-      return User.findByIdAndDelete(userIdToDelete);
-    })
-    .then(() => {
-      res.status(200).json({ message: 'User deleted successfully.' });
-    })
-    .catch((err) => {
-      if (!err.statusCode) err.statusCode = 500;
-      next(err);
-    });
+    // Delete the user
+    await User.findByIdAndDelete(userIdToDelete);
+
+    res.status(200).json({ message: 'User deleted successfully.' });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
 };
