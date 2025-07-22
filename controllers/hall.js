@@ -120,6 +120,8 @@ exports.updateHall = (req, res, next) => {
   const capacity = req.body.capacity;
   const status = req.body.status;
 
+  let foundHall;
+
   Hall.findById(hallId)
     .then((hall) => {
       if (!hall) {
@@ -133,13 +135,32 @@ exports.updateHall = (req, res, next) => {
         throw error;
       }
 
-      hall.name = name;
-      hall.location = location;
-      hall.capacity = capacity;
-      if (status && ['available', 'reserved'].includes(status)) {
-        hall.status = status;
+      foundHall = hall;
+      // If capacity is being reduced, check approved events only
+      if (capacity < hall.capacity) {
+        return Event.find({
+          hall: hallId,
+          status: 'approved',
+          capacity: { $gt: capacity },
+        }).then((conflictingEvents) => {
+          if (conflictingEvents.length > 0) {
+            const error = new Error(
+              'Cannot reduce hall capacity. Some approved events exceed the new capacity.'
+            );
+            error.statusCode = 409;
+            throw error;
+          }
+        });
       }
-      return hall.save();
+    })
+    .then(() => {
+      foundHall.name = name;
+      foundHall.location = location;
+      foundHall.capacity = capacity;
+      if (status && ['available', 'reserved'].includes(status)) {
+        foundHall.status = status;
+      }
+      return foundHall.save();
     })
     .then((updatedHall) => {
       res.status(200).json({
@@ -169,7 +190,22 @@ exports.deleteHall = (req, res, next) => {
         error.statusCode = 403;
         throw error;
       }
-      return Hall.findByIdAndDelete(hallId);
+
+      // Check for approved events using this hall
+      return Event.find({ hall: hallId, status: 'approved' }).then(
+        (linkedEvents) => {
+          if (linkedEvents.length > 0) {
+            const error = new Error(
+              'Cannot delete hall. It is linked to approved events.'
+            );
+            error.statusCode = 409;
+            throw error;
+          }
+
+          // Safe to delete
+          return Hall.findByIdAndDelete(hallId);
+        }
+      );
     })
     .then(() => {
       res.status(200).json({ message: 'Hall deleted successfully' });

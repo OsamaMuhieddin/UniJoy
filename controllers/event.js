@@ -41,6 +41,8 @@ exports.getHostEvents = (req, res, next) => {
     .then((count) => {
       totalItems = count;
       return Event.find(filter)
+        .populate('hall', 'name location capacity')
+        .populate('category', 'name')
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -170,6 +172,8 @@ exports.getHostEvent = (req, res, next) => {
   const eventId = req.params.eventId;
 
   Event.findById(eventId)
+    .populate('hall', 'name location capacity')
+    .populate('category', 'name')
     .then((event) => {
       if (!event) {
         const error = new Error('Could not find event');
@@ -370,6 +374,34 @@ exports.deleteEvent = (req, res, next) => {
       }
       eventDoc = event;
 
+      // Refund payments if event is paid
+      if (event.price > 0) {
+        return Payment.find({ event: eventId, status: 'completed' }).then(
+          (payments) => {
+            const refundPromises = payments.map((payment) => {
+              if (!payment.stripePaymentIntentId) {
+                // Skip if no PaymentIntent ID
+                return Promise.resolve();
+              }
+              return stripe.refunds
+                .create({
+                  payment_intent: payment.stripePaymentIntentId,
+                  amount: payment.amount * 100, // multiply by 100 to convert dollars to cents
+                })
+                .then(() => {
+                  // Update payment status to refunded in DB
+                  payment.status = 'refunded';
+                  return payment.save();
+                });
+            });
+            return Promise.all(refundPromises);
+          }
+        );
+      }
+      // If not paid, just resolve immediately
+      return Promise.resolve();
+    })
+    .then(() => {
       // Delete associated hall reservation if it exists
       return HallReservation.findOneAndDelete({ event: event._id });
     })
@@ -431,6 +463,8 @@ exports.getAllApprovedEvents = (req, res, next) => {
     .then((count) => {
       totalItems = count;
       return Event.find(filter)
+        .populate('hall', 'name location capacity')
+        .populate('category', 'name')
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -451,6 +485,8 @@ exports.getSingleApprovedEvent = (req, res, next) => {
   const eventId = req.params.eventId;
 
   Event.findOne({ _id: eventId, status: 'approved' })
+    .populate('hall', 'name location capacity')
+    .populate('category', 'name')
     .then((event) => {
       if (!event) {
         const error = new Error('Event not found or not approved');
@@ -496,6 +532,8 @@ exports.getAllEvents = (req, res, next) => {
     .then((count) => {
       totalItems = count;
       return Event.find(filter)
+        .populate('hall', 'name location capacity')
+        .populate('category', 'name')
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -526,6 +564,8 @@ exports.getSingleEvent = (req, res, next) => {
   const eventId = req.params.eventId;
 
   Event.findById(eventId)
+    .populate('hall', 'name location capacity')
+    .populate('category', 'name')
     .then((event) => {
       if (!event) {
         const error = new Error('Event not found');

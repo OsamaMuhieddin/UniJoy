@@ -397,6 +397,8 @@ exports.getUserRegisteredEvents = (req, res, next) => {
       }
 
       return Event.find(filter)
+        .populate('hall', 'name location capacity')
+        .populate('category', 'name')
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -450,7 +452,9 @@ exports.getUserRegisteredEvent = (req, res, next) => {
       }
 
       // Fetch the event details
-      return Event.findById(eventId);
+      return Event.findById(eventId)
+        .populate('hall', 'name location capacity')
+        .populate('category', 'name');
     })
     .then((event) => {
       if (!event) {
