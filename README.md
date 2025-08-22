@@ -104,9 +104,13 @@ npm install
 Create a .env file with the following keys:
 
 PORT=8080
+
 MONGODB_URI=your_mongodb_connection_string
+
 JWT_SECRET=your_jwt_secret
+
 STRIPE_SECRET_KEY=your_stripe_secret_key
+
 SENDGRID_API_KEY=your_sendgrid_api_key
 
 
