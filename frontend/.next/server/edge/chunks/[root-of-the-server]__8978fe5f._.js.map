@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 23, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/middleware.ts/proxy.mjs"],"sourcesContent":["import { registerClientReference } from \"react-server-dom-turbopack/server.edge\";\nexport const middleware = registerClientReference(\n    function() { throw new Error(\"Attempted to call middleware() from the server but middleware is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.\"); },\n    \"[project]/middleware.ts <module evaluation>\",\n    \"middleware\",\n);\n"],"names":[],"mappings":";;;AAAA;;AACO,MAAM,aAAa,CAAA,GAAA,yMAAA,CAAA,0BAAuB,AAAD,EAC5C;IAAa,MAAM,IAAI,MAAM;AAAoO,GACjQ,+CACA"}},
+    {"offset": {"line": 37, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/middleware.ts/proxy.mjs"],"sourcesContent":["import { registerClientReference } from \"react-server-dom-turbopack/server.edge\";\nexport const middleware = registerClientReference(\n    function() { throw new Error(\"Attempted to call middleware() from the server but middleware is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.\"); },\n    \"[project]/middleware.ts\",\n    \"middleware\",\n);\n"],"names":[],"mappings":";;;AAAA;;AACO,MAAM,aAAa,CAAA,GAAA,yMAAA,CAAA,0BAAuB,AAAD,EAC5C;IAAa,MAAM,IAAI,MAAM;AAAoO,GACjQ,2BACA"}},
+    {"offset": {"line": 51, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":""}}]
+}
