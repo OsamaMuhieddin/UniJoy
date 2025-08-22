@@ -24,7 +24,8 @@ const reportRoutes = require('./routes/report');
 
 const User = require('./models/user');
 
-const MONGODB_URI = 'mongodb://127.0.0.1:27017';
+const MONGODB_URI = process.env.MONGODB_URI;
+const port = process.env.PORT;
 
 const app = express();
 
@@ -137,7 +138,7 @@ app.use((error, req, res, next) => {
 mongoose
   .connect(MONGODB_URI)
   .then((result) => {
-    app.listen(3000);
+    app.listen(port);
 
     require('./jobs/freeExpiredHalls');
   })

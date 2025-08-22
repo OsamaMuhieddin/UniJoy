@@ -127,7 +127,7 @@ exports.login = (req, res, next) => {
           userId: loadedUser._id.toString(),
           role: loadedUser.role,
         },
-        'somesecret',
+        process.env.JWT_SECRET,
         { expiresIn: '1h' }
       );
       res.status(200).json({
