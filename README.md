@@ -119,7 +119,7 @@ SENDGRID_API_KEY=your_sendgrid_api_key
 npm start
 
 
-🔑 Authentication & Roles
+## 🔑 Authentication & Roles
 
 All protected routes require a valid JWT token.
 
@@ -131,7 +131,8 @@ host → create/manage events (pending approval).
 
 admin → full system access (approve events, manage halls/users).
 
-💳 Payments & Refunds
+
+## 💳 Payments & Refunds
 
 Stripe Checkout is used for secure payment sessions.
 
@@ -143,13 +144,14 @@ An event is cancelled.
 
 Payment records are stored in MongoDB for verification and reporting.
 
-📊 Reports
+## 📊 Reports
 
 PDF invoices generated for every successful registration.
 
 Event reports available for hosts/admins, including hall reservations and revenue.
 
-🧪 Testing
+
+## 🧪 Testing
 
 API testing recommended with Postman or Insomnia.
 
@@ -157,7 +159,8 @@ Include auth token in headers for protected routes.
 
 Example Postman collection can be added later.
 
-🤝 Contribution
+
+## 🤝 Contribution
 
 Fork the repo
 
@@ -169,6 +172,7 @@ Push to branch (git push origin feature-name)
 
 Create a Pull Request
 
-📄 License
+
+## 📄 License
 
 This project is licensed under the MIT License.
