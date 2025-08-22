@@ -71,12 +71,19 @@ This repository contains the **backend API**, built with **Node.js, Express, and
 
 UniJoy/
 ├── controllers/ # Request handlers (Auth, Event, Hall, Payment, etc.)
+
 ├── models/ # Mongoose schemas (User, Event, Hall, Reservation, Payment)
+
 ├── routes/ # API routes
+
 ├── middlewares/ # Auth & error handling middlewares
+
 ├── utils/ # Helpers (check conflicts)
+
 ├── app.js # Express app setup
+
 ├── jobs/ # job functions (free hall reservations) 
+
 └── README.md
 
 ---
@@ -93,6 +100,7 @@ UniJoy/
 npm install
 
 3. **Configure environment variables**
+   
 Create a .env file with the following keys:
 
 PORT=8080
